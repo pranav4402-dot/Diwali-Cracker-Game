@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Diwali Cracker Game</title>
+    <style>
+        body {
+            background: radial-gradient(circle at top, #ffe082 0%, #ff7043 100%);
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background: #222;
+            border: 5px solid gold;
+            box-shadow: 0 0 40px #ffa726;
+        }
+        #scoreBoard {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px 30px;
+            border-radius: 16px;
+            font-size: 1.3em;
+            color: #ff6f00;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        #startBtn {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff6f00;
+            color: #fff;
+            font-size: 2em;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ffb300;
+            font-family: inherit;
+        }
+        #startBtn:active {
+            background: #d84315;
+        }
+    </style>
+</head>
+<body>
+    <div id="scoreBoard">Score: 0 | Time: 30</div>
+    <canvas id="gameCanvas" width="700" height="500"></canvas>
+    <button id="startBtn">Start Diwali Cracker Game!</button>
+    <audio id="boomSound" src="https://cdn.pixabay.com/audio/2022/10/16/audio_12a1f7a4fa.mp3" preload="auto"></audio>
+    <audio id="bgMusic" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124b8e6c6b.mp3" preload="auto" loop></audio>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreBoard = document.getElementById('scoreBoard');
+const startBtn = document.getElementById('startBtn');
+const boomSound = document.getElementById('boomSound');
+const bgMusic = document.getElementById('bgMusic');
+
+let crackers = [];
+let particles = [];
+let score = 0;
+let timeLeft = 30;
+let gameActive = false;
+let crackerColors = ['#ffea00', '#ff1744', '#00e676', '#00b0ff', '#ff9100', '#c51162', '#ffd600', '#00c853'];
+
+function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Cracker Object
+function Cracker(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.radius = 22;
+    this.color = color;
+    this.exploded = false;
+    this.draw = function() {
+        // Body
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = "#fffde7";
+        ctx.shadowBlur = 16;
+        ctx.fill();
+        ctx.closePath();
+        // Fuse
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - this.radius);
+        ctx.lineTo(this.x, this.y - this.radius - 20);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - this.radius - 22, 5, 0, Math.PI, true);
+        ctx.strokeStyle = "#ffab00";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+// Particle for explosion
+function Particle(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.velX = (Math.random() - 0.5) * 6;
+    this.velY = (Math.random() - 0.5) * 6;
+    this.alpha = 1;
+    this.color = color;
+    this.size = randomInt(2, 5);
+    this.draw = function() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, 2 * Math.PI);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
+    this.update = function() {
+        this.x += this.velX;
+        this.y += this.velY;
+        this.alpha -= 0.02;
+    }
+}
+
+// Spawn crackers
+function spawnCrackers() {
+    if (!gameActive) return;
+    const n = randomInt(1, 2);
+    for (let i = 0; i < n; i++) {
+        let x = randomInt(60, canvas.width - 60);
+        let y = randomInt(60, canvas.height - 60);
+        let color = crackerColors[randomInt(0, crackerColors.length - 1)];
+        crackers.push(new Cracker(x, y, color));
+    }
+    setTimeout(spawnCrackers, randomInt(700, 1200));
+}
+
+// Draw all crackers and particles
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Diwali text
+    ctx.save();
+    ctx.font = "bold 40px Segoe UI, sans-serif";
+    ctx.fillStyle = "#fffde7";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "#ffab00";
+    ctx.shadowBlur = 10;
+    ctx.fillText("💥 Diwali Cracker Game! 💥", canvas.width/2, 54);
+    ctx.restore();
+
+    // Draw crackers
+    for (let cracker of crackers) {
+        cracker.draw();
+    }
+    // Draw particles
+    for (let p of particles) {
+        p.draw();
+    }
+}
+
+// Update particles, remove faded, remove exploded crackers
+function update() {
+    particles = particles.filter(p => p.alpha > 0.1);
+    for (let p of particles) p.update();
+
+    crackers = crackers.filter(c => !c.exploded);
+}
+
+// Game loop
+function gameLoop() {
+    if (!gameActive) return;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Handle click on canvas
+canvas.addEventListener('mousedown', function(e) {
+    if (!gameActive) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    for (let cracker of crackers) {
+        let dist = Math.sqrt((mx - cracker.x) ** 2 + (my - cracker.y) ** 2);
+        if (dist < cracker.radius + 12 && !cracker.exploded) {
+            cracker.exploded = true;
+            score += 10;
+            boomSound.currentTime = 0;
+            boomSound.play();
+            // Create multiple particles
+            for (let i = 0; i < 36; i++) {
+                particles.push(new Particle(cracker.x, cracker.y, cracker.color));
+            }
+        }
+    }
+    updateScoreboard();
+});
+
+// Scoreboard update
+function updateScoreboard() {
+    scoreBoard.innerText = `Score: ${score} | Time: ${timeLeft}`;
+}
+
+// Timer
+function startTimer() {
+    timeLeft = 30;
+    updateScoreboard();
+    let timer = setInterval(() => {
+        if (!gameActive) {
+            clearInterval(timer);
+            return;
+        }
+        timeLeft--;
+        updateScoreboard();
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            endGame();
+        }
+    }, 1000);
+}
+
+// Game start & end
+function startGame() {
+    gameActive = true;
+    score = 0;
+    crackers = [];
+    particles = [];
+    startBtn.style.display = 'none';
+    bgMusic.currentTime = 0;
+    bgMusic.volume = 0.3;
+    bgMusic.play();
+    updateScoreboard();
+    spawnCrackers();
+    startTimer();
+    gameLoop();
+}
+function endGame() {
+    gameActive = false;
+    bgMusic.pause();
+    setTimeout(() => {
+        draw();
+        ctx.save();
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(canvas.width/2 - 170, canvas.height/2 - 60, 340, 120);
+        ctx.globalAlpha = 1;
+        ctx.font = "bold 32px Segoe UI, sans-serif";
+        ctx.fillStyle = "#ff6f00";
+        ctx.textAlign = "center";
+        ctx.fillText("Game Over!", canvas.width/2, canvas.height/2 - 10);
+        ctx.font = "24px Segoe UI, sans-serif";
+        ctx.fillStyle = "#333";
+        ctx.fillText("Your Score: " + score, canvas.width/2, canvas.height/2 + 36);
+        ctx.restore();
+        startBtn.innerText = "Play Again";
+        startBtn.style.display = "block";
+    }, 400);
+}
+
+startBtn.addEventListener('click', startGame);
+
+// Initial drawing
+draw();
+</script>
+</body>
+</html>
